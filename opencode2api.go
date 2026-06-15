@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"bufio"
@@ -1521,6 +1521,7 @@ func fetchTorExitStatus() TorStatus {
 		status.Error = err.Error()
 		return status
 	}
+	req.Header.Set("User-Agent", "curl/8.0")
 	resp, err := getHTTPClient().Do(req)
 	if err != nil {
 		status.Error = err.Error()
