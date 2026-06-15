@@ -3,11 +3,16 @@ name: Build
 on:
   push:
     branches: [main, master]
+    tags:
+      - "v*"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
-    name: ${{ matrix.goos }}-${{ matrix.goarch }}
+    name: ${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goarm || '' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -54,10 +59,38 @@ jobs:
           mkdir -p dist
           suffix="${GOARCH}"
           if [ -n "${GOARM}" ]; then suffix="${suffix}v${GOARM}"; fi
-          go build -trimpath -ldflags="-s -w" -o "dist/opencode2api-${GOOS}-${suffix}${EXT}" ./opencode2api.go
+          name="opencode2api-${GOOS}-${suffix}${EXT}"
+          go build -trimpath -ldflags="-s -w" -o "dist/${name}" ./opencode2api.go
+          cd dist
+          if [ "${GOOS}" = "windows" ]; then
+            zip "${name}.zip" "${name}"
+          else
+            tar -czf "${name}.tar.gz" "${name}"
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: opencode2api-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goarm || '' }}
-          path: dist/*
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+
+  release:
+    name: Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
