@@ -77,7 +77,7 @@ jobs:
             dist/*.tar.gz
 
   release:
-    name: Release
+    name: Tagged Release
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
@@ -94,3 +94,31 @@ jobs:
         with:
           files: release/*
           generate_release_notes: true
+
+  latest:
+    name: Latest Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Publish latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          git tag -f latest "${GITHUB_SHA}"
+          git push -f origin latest
+          gh release create latest release/* \
+            --title "Latest build" \
+            --notes "Automatic build from ${GITHUB_SHA}." \
+            --latest
